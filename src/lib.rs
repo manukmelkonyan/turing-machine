@@ -13,13 +13,13 @@ pub enum Direction {
 #[derive(Clone, Copy)]
 pub struct TransitionRule {
     from_state: u32,
+    from_symbol: Symbol,
     to_state: State,
-    read_symbol: Symbol,
-    write_symbol: Symbol,
-    head_direction: Direction,
+    new_symbol: Symbol,
+    head_move_dir: Direction,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Symbol {
     Zero = 0,
     One = 1,
@@ -82,7 +82,7 @@ pub struct TuringMachine {
     head: usize,
     initial_state: Option<u32>,
     states: HashMap<u32, ProgramState>,
-    transition_table: Vec<TransitionRule>,
+    transition_table: HashMap<u32, HashMap<Symbol, TransitionRule>>,
     __visible_area: (usize, usize)
 }
 
@@ -93,15 +93,43 @@ impl TuringMachine {
             initial_state: None,
             head: DEFAULT_TAPE_SIZE / 2 * USIZE_BIT_SIZE, // set the head to the middle of the tape by default
             states: HashMap::default(),
-            transition_table: Vec::default(),
+            transition_table: HashMap::default(),
             __visible_area: (0, 0),
         }
     }
 
     pub fn run(&mut self) -> Result<State, String> {
-        let initial_state = self.initial_state.ok_or("ERROR: initial state is not set");
+        let initial_state = self.states.get(
+            &self.initial_state.ok_or("ERROR: initial state is not set")?,
+        ).unwrap();
+
+        let mut current_state = State::ProgramState(*initial_state);
         
-        Ok(State::Halt)
+        loop {
+            match current_state {
+                State::ProgramState(ProgramState { id: state_id }) => {
+                    let current_symbol = self.get_head_value();
+                    let transition_rule = self.get_transition_rule(&state_id, &current_symbol);
+                    match transition_rule {
+                        Some(TransitionRule { to_state, new_symbol, head_move_dir, .. }) => {
+                            let new_symbol = *new_symbol;
+                            let head_move_dir = *head_move_dir;
+                            current_state = *to_state;
+                            self.set_head_value(new_symbol);
+                            self.move_head(head_move_dir);
+                        }
+                        None => return Ok(State::Halt),
+                    }
+                },
+                state => return Ok(state)
+            }
+        }
+    }
+
+    pub fn get_transition_rule(&self, state_id: &u32, symbol: &Symbol) -> Option<&TransitionRule> {
+        self.transition_table
+            .get(&state_id).unwrap()
+            .get(symbol)
     }
 
     pub fn set_initial_state(&mut self, state_id: u32) -> Result<(), String> {
@@ -122,23 +150,38 @@ impl TuringMachine {
         self.validate_transition_rules(transition_rules)?;
         
         for t in transition_rules {
-            self.transition_table.push(*t);
+            let from_state = &t.from_state;
+            let from_symbol = &t.from_symbol;
+            if !self.transition_table.contains_key(from_state) {
+                self.transition_table.insert(*from_state, HashMap::default());
+            }
+            self.transition_table
+                .get_mut(from_state).unwrap()
+                .insert(*from_symbol, *t);
         }
 
         Ok(())
     }
 
     fn validate_transition_rules(&self, transition_rules: &Vec<TransitionRule>) -> Result<(), String> {
-        let mut states_used = HashSet::<&u32>::new();
+        let mut states_used = HashMap::<&u32, Vec<Symbol>>::new();
 
         for t in transition_rules {
-            if !self.states.contains_key(&t.from_state) {
-                return Err(format!("ERROR: State with id `{}` does not exist", &t.from_state));
+            let from_state = &t.from_state;
+            let from_symbol = &t.from_symbol;
+            if !self.states.contains_key(from_state) {
+                return Err(format!("ERROR: State with id `{}` does not exist", from_state));
             }
-            if states_used.contains(&t.from_state) {
-                return Err(format!("ERROR: State with id `{}` is already bound to a transition rule as a `from_state`", &t.from_state));
+            
+            if !states_used.contains_key(from_state) {
+                states_used.insert(from_state, Vec::new());
             }
-            states_used.insert(&t.from_state);
+            
+            let already_mapped_symbols = states_used.get_mut(from_state).unwrap();
+            if already_mapped_symbols.contains(from_symbol) {
+                return Err(format!("ERROR: State with id `{}` is already bound to a transition rule as a `from_state`", from_state));
+            }
+            already_mapped_symbols.push(*from_symbol);
         }
         Ok(())
     }
@@ -194,7 +237,16 @@ impl TuringMachine {
         }
     }
 
-    pub fn set_head_value(&mut self, value: &Symbol) {
+    pub fn move_head(&mut self, direction: Direction) {
+        // TODO: if head moves outside tape bounds, reallocate tape with double size
+        let delta = match direction {
+            Direction::Left(delta) => delta,
+            Direction::Right(delta) => delta,
+        };
+        self.head = self.head + delta as usize;
+    }
+
+    pub fn set_head_value(&mut self, value: Symbol) {
         let cell = &mut self.tape[self.head / USIZE_BIT_SIZE];
         let bit_idx = self.head % USIZE_BIT_SIZE;
 
@@ -209,6 +261,7 @@ impl TuringMachine {
 //////////////////////////////////////////////////// TESTS ////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: add tests
 // #[cfg(test)]
 // mod test {
 //     use super::*;
