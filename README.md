@@ -1,2 +1,5 @@
-# turing-machine
-Turing machine simulation in Rust
+# Turing Machine
+
+A simple binary Turing machine simulation.
+
+This repository provides a library of a Turing machine implementation with binary alphabet (0, 1) and a tape implemented with bit-vector
