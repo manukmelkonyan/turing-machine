@@ -1,7 +1,10 @@
-use std::collections::{HashMap, HashSet};
+pub mod bit_vec;
+use bit_vec::{USIZE_BIT_SIZE, get_bit, set_bit, unset_bit};
+use std::collections::{HashMap};
 
-const USIZE_BIT_SIZE: usize = usize::BITS as usize;
-const DEFAULT_TAPE_SIZE: usize = 1000; // not the bitvec length.
+const DEFAULT_TAPE_SIZE: usize = 1000; // this is not the actual tape size (number of bit-vectors)
+
+type ProgramStateId = u32;
 
 #[derive(Clone, Copy)]
 #[repr(i8)]
@@ -12,7 +15,7 @@ pub enum Direction {
 
 #[derive(Clone, Copy)]
 pub struct TransitionRule {
-    from_state: u32,
+    from_state: ProgramStateId,
     from_symbol: Symbol,
     to_state: State,
     new_symbol: Symbol,
@@ -26,8 +29,8 @@ pub enum Symbol {
 }
 
 impl Symbol {
-    fn vec_from_numbers(nums: &[u8]) -> Vec<Symbol> {
-        nums
+    fn vec_from_numbers(numbers: &[u8]) -> Vec<Symbol> {
+        numbers
             .iter()
             .map(|num| {
                 match num {
@@ -42,7 +45,7 @@ impl Symbol {
 
 #[derive(Clone, Copy)]
 pub struct ProgramState {
-    pub id: u32,
+    pub id: ProgramStateId,
 }
 
 #[derive(Clone, Copy)]
@@ -53,36 +56,19 @@ pub enum State {
 }
 
 impl State {
-    pub fn define(id: u32) -> State {
+    pub fn define(id: ProgramStateId) -> State {
         State::ProgramState(
             ProgramState { id }
         )
     }
 }
 
-// TODO: rewrite with macros
-pub mod bit_vec {
-    use super::USIZE_BIT_SIZE;
-
-    pub fn get_bit(cell: &usize, index: &usize) -> usize {
-        (cell >> (USIZE_BIT_SIZE - index - 1)) & 1 
-    }
-
-    pub fn set_bit(cell: &mut usize, index: &usize) {
-        *cell |= 1 << (USIZE_BIT_SIZE - index - 1);
-    }
-
-    pub fn unset_bit(cell: &mut usize, index: &usize) {
-        *cell &= !(1 << (USIZE_BIT_SIZE - index - 1))
-    }
-}
-
 pub struct TuringMachine {
     tape: Vec<usize>, // bit-vector tape
     head: usize,
-    initial_state: Option<u32>,
-    states: HashMap<u32, ProgramState>,
-    transition_table: HashMap<u32, HashMap<Symbol, TransitionRule>>,
+    initial_state: Option<ProgramStateId>,
+    states: HashMap<ProgramStateId, ProgramState>,
+    transition_table: HashMap<ProgramStateId, HashMap<Symbol, TransitionRule>>,
     __visible_area: (usize, usize)
 }
 
@@ -126,13 +112,13 @@ impl TuringMachine {
         }
     }
 
-    pub fn get_transition_rule(&self, state_id: &u32, symbol: &Symbol) -> Option<&TransitionRule> {
+    pub fn get_transition_rule(&self, state_id: &ProgramStateId, symbol: &Symbol) -> Option<&TransitionRule> {
         self.transition_table
             .get(&state_id).unwrap()
             .get(symbol)
     }
 
-    pub fn set_initial_state(&mut self, state_id: u32) -> Result<(), String> {
+    pub fn set_initial_state(&mut self, state_id: ProgramStateId) -> Result<(), String> {
         if !self.states.contains_key(&state_id) {
             return Err(format!("ERROR: state with id `{}` is not defined", &state_id));
         }
@@ -164,7 +150,7 @@ impl TuringMachine {
     }
 
     fn validate_transition_rules(&self, transition_rules: &Vec<TransitionRule>) -> Result<(), String> {
-        let mut states_used = HashMap::<&u32, Vec<Symbol>>::new();
+        let mut states_used = HashMap::<&ProgramStateId, Vec<Symbol>>::new();
 
         for t in transition_rules {
             let from_state = &t.from_state;
@@ -199,8 +185,8 @@ impl TuringMachine {
                 chunk.iter().for_each(|symbol| {
                     let bit_idx = self.head % USIZE_BIT_SIZE;
                     match symbol {
-                        Symbol::Zero => bit_vec::unset_bit(cell, &bit_idx),
-                        Symbol::One => bit_vec::set_bit(cell, &bit_idx),
+                        Symbol::Zero => unset_bit(cell, &bit_idx),
+                        Symbol::One => set_bit(cell, &bit_idx),
                     }
                 });
             }
@@ -229,7 +215,7 @@ impl TuringMachine {
         let cell = &self.tape[self.head / USIZE_BIT_SIZE];
         let bit_idx = self.head % USIZE_BIT_SIZE;
 
-        let value = bit_vec::get_bit(cell, &bit_idx);
+        let value = get_bit(cell, &bit_idx);
         match value {
             0 => Symbol::Zero,
             1 => Symbol::One,
@@ -251,8 +237,8 @@ impl TuringMachine {
         let bit_idx = self.head % USIZE_BIT_SIZE;
 
         match value {
-            Symbol::Zero => bit_vec::unset_bit(cell, &bit_idx),
-            Symbol::One => bit_vec::set_bit(cell, &bit_idx),
+            Symbol::Zero => unset_bit(cell, &bit_idx),
+            Symbol::One => set_bit(cell, &bit_idx),
         }
     }
 }
