@@ -15,7 +15,7 @@ pub enum Direction {
 
 #[derive(Clone, Copy)]
 pub struct TransitionRule {
-    pub from_state: ProgramStateId,
+    pub from_state: ProgramState,
     pub from_symbol: Symbol,
     pub to_state: State,
     pub new_symbol: Symbol,
@@ -23,7 +23,7 @@ pub struct TransitionRule {
 }
 
 impl TransitionRule {
-    pub fn new(from_state: ProgramStateId, from_symbol: Symbol, new_symbol: Symbol, head_move_dir: Direction, to_state: State) -> TransitionRule {
+    pub fn new(from_state: ProgramState, from_symbol: Symbol, new_symbol: Symbol, head_move_dir: Direction, to_state: State) -> TransitionRule {
         TransitionRule { from_state, from_symbol, new_symbol, head_move_dir, to_state }
     }
 }
@@ -146,11 +146,11 @@ impl TuringMachine {
         for t in transition_rules {
             let from_state = &t.from_state;
             let from_symbol = &t.from_symbol;
-            if !self.transition_table.contains_key(from_state) {
-                self.transition_table.insert(*from_state, HashMap::default());
+            if !self.transition_table.contains_key(&from_state.id) {
+                self.transition_table.insert(from_state.id, HashMap::default());
             }
             self.transition_table
-                .get_mut(from_state).unwrap()
+                .get_mut(&from_state.id).unwrap()
                 .insert(*from_symbol, *t);
         }
 
@@ -163,17 +163,17 @@ impl TuringMachine {
         for t in transition_rules {
             let from_state = &t.from_state;
             let from_symbol = &t.from_symbol;
-            if !self.states.contains_key(from_state) {
-                return Err(format!("ERROR: State with id `{}` does not exist", from_state));
+            if !self.states.contains_key(&from_state.id) {
+                return Err(format!("ERROR: State with id `{}` does not exist", from_state.id));
             }
             
-            if !states_used.contains_key(from_state) {
-                states_used.insert(from_state, Vec::new());
+            if !states_used.contains_key(&from_state.id) {
+                states_used.insert(&from_state.id, Vec::new());
             }
             
-            let already_mapped_symbols = states_used.get_mut(from_state).unwrap();
+            let already_mapped_symbols = states_used.get_mut(&from_state.id).unwrap();
             if already_mapped_symbols.contains(from_symbol) {
-                return Err(format!("ERROR: State with id `{}` is already bound to a transition rule as a `from_state`", from_state));
+                return Err(format!("ERROR: State with id `{}` is already bound to a transition rule as a `from_state`", from_state.id));
             }
             already_mapped_symbols.push(*from_symbol);
         }

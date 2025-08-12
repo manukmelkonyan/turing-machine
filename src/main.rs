@@ -13,17 +13,17 @@ fn main() {
     machine.set_initial_state(q1.id).expect("Initial state is not set");
     
     machine.define_transition_table(&vec![
-        TransitionRule::new(q1.id, Symbol::Zero, Symbol::Zero, Direction::Stay, State::Termination),
-        TransitionRule::new(q1.id, Symbol::One, Symbol::Zero, Direction::Right, State::ProgramState(q2)),
+        TransitionRule::new(q1, Symbol::Zero, Symbol::Zero, Direction::Stay, State::Termination),
+        TransitionRule::new(q1, Symbol::One, Symbol::Zero, Direction::Right, State::ProgramState(q2)),
 
-        TransitionRule::new(q2.id, Symbol::Zero, Symbol::One, Direction::Left, State::ProgramState(q3)),
-        TransitionRule::new(q2.id, Symbol::One, Symbol::One, Direction::Right, State::ProgramState(q2)),
+        TransitionRule::new(q2, Symbol::Zero, Symbol::One, Direction::Left, State::ProgramState(q3)),
+        TransitionRule::new(q2, Symbol::One, Symbol::One, Direction::Right, State::ProgramState(q2)),
 
-        TransitionRule::new(q3.id, Symbol::Zero, Symbol::Zero, Direction::Right, State::ProgramState(q4)),
-        TransitionRule::new(q3.id, Symbol::One, Symbol::One, Direction::Left, State::ProgramState(q3)),
+        TransitionRule::new(q3, Symbol::Zero, Symbol::Zero, Direction::Right, State::ProgramState(q4)),
+        TransitionRule::new(q3, Symbol::One, Symbol::One, Direction::Left, State::ProgramState(q3)),
 
-        TransitionRule::new(q4.id, Symbol::Zero, Symbol::Zero, Direction::Stay, State::Halt),
-        TransitionRule::new(q4.id, Symbol::One, Symbol::Zero, Direction::Right, State::Termination),
+        TransitionRule::new(q4, Symbol::Zero, Symbol::Zero, Direction::Stay, State::Halt),
+        TransitionRule::new(q4, Symbol::One, Symbol::Zero, Direction::Right, State::Termination),
     ]).unwrap();
 
     let input = vec![
